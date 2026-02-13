@@ -9,7 +9,7 @@ import time
 import socket
 
 class JobApplicationEmailer:
-    def __init__(self, sender_email: str, sender_password: str, sender_name: str):
+    def __init__(self, sender_email: str, sender_password: str, sender_name: str, sender_phone: str = "", sender_linkedin: str = "", sender_website: str = ""):
         """
         Initialize the email sender
 
@@ -17,10 +17,16 @@ class JobApplicationEmailer:
             sender_email: Your email address
             sender_password: Your email password or app-specific password
             sender_name: Your full name
+            sender_phone: Your phone number (optional)
+            sender_linkedin: Your LinkedIn profile URL (optional)
+            sender_website: Your portfolio/website URL (optional)
         """
         self.sender_email = sender_email
         self.sender_password = sender_password
         self.sender_name = sender_name
+        self.sender_phone = sender_phone
+        self.sender_linkedin = sender_linkedin
+        self.sender_website = sender_website
 
     def create_email_body(self, hr_name: str = "Hiring Manager") -> str:
         """
@@ -32,11 +38,20 @@ class JobApplicationEmailer:
         Returns:
             Email body as string
         """
+        # Build contact information section
+        contact_info = f"{self.sender_email}"
+        if self.sender_phone:
+            contact_info += f"\nPhone: {self.sender_phone}"
+        if self.sender_linkedin:
+            contact_info += f"\nLinkedIn: {self.sender_linkedin}"
+        if self.sender_website:
+            contact_info += f"\nPortfolio: {self.sender_website}"
+        
         email_body = f"""Dear {hr_name},
 
 I hope this email finds you well.
 
-I am writing to express my strong interest in DevOps Engineer opportunities within your organization. With a proven track record in cloud infrastructure, automation, and CI/CD pipelines, I am confident that my skills align well with your team's needs.
+I am writing to express my strong interest in DevOps SRE Engineer opportunities within your organization. With 4+ years of proven track record in cloud infrastructure, automation, and CI/CD pipelines, I am confident that my skills align well with your team's needs.
 
 Key Highlights of My Profile:
 • Expertise in cloud platforms (AWS, Azure, GCP)
@@ -55,7 +70,7 @@ Thank you for considering my application. I look forward to the possibility of w
 
 Best regards,
 {self.sender_name}
-{self.sender_email}"""
+{contact_info}"""
 
         return email_body
 

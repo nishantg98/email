@@ -61,7 +61,7 @@ HR_EMAIL_LIST = [
 Open Command Prompt or PowerShell and navigate to the folder:
 
 ```bash
-cd "c:\Users\nishant.gupta\OneDrive - UKG\Desktop\UKG\test"
+cd "c:\Users\test"
 python send_applications.py
 ```
 
@@ -125,8 +125,8 @@ DELAY_BETWEEN_EMAILS = 10  # Change to desired seconds
 ## 📁 File Structure
 
 ```
-test/
-├── email_sender.py          # Main email sending class
+email/
+├── email_sender_v2.py          # Main email sending class
 ├── config.py                # Configuration file (UPDATE THIS)
 ├── send_applications.py     # Simple runner script
 └── README.md               # This file

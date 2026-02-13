@@ -30,7 +30,7 @@ Open `config.py` and update:
 Example:
 ```python
 YOUR_NAME = "Nishant Gupta"
-YOUR_EMAIL = "nishant.gupta@gmail.com"
+YOUR_EMAIL = "nishxxx@gmail.com"
 YOUR_PASSWORD = "abcd efgh ijkl mnop"
 RESUME_PATH = r"c:\Users\nishant.gupta\Documents\Nishant_Gupta_Resume.pdf"
 HR_EMAIL_LIST = [

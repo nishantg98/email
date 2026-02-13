@@ -55,7 +55,10 @@ def main():
     emailer = JobApplicationEmailer(
         sender_email=config.YOUR_EMAIL,
         sender_password=config.YOUR_PASSWORD,
-        sender_name=config.YOUR_NAME
+        sender_name=config.YOUR_NAME,
+        sender_phone=config.YOUR_PHONE,
+        sender_linkedin=config.YOUR_LINKEDIN,
+        sender_website=config.YOUR_WEBSITE
     )
 
     emailer.send_bulk_emails(

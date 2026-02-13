@@ -76,9 +76,6 @@ Key Highlights:
 Thank you for considering my application.
 
 Best regards,
-Nishant Gupta
-nishantg2798@gmail.com
-+91-8510094400
 ```
 
 ---
@@ -97,8 +94,8 @@ nishantg2798@gmail.com
 ## 🎯 Your Current Progress
 
 ✅ YOUR_NAME = "Nishant Gupta"
-✅ YOUR_EMAIL = "nishantg2798@gmail.com"
-✅ YOUR_PHONE = "+91-8510094400"
+✅ YOUR_EMAIL = "xxxx@gmail.com"
+✅ YOUR_PHONE = "+91-xxxxxx"
 ❌ YOUR_PASSWORD = Need App Password
 ❌ RESUME_PATH = Need to set this
 ❌ HR_EMAIL_LIST = Need to add HR emails
