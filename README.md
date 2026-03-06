@@ -58,13 +58,55 @@ HR_EMAIL_LIST = [
 
 #### Step 3: Run the Script
 
-Open Command Prompt or PowerShell and navigate to the folder:
+Open Command Prompt or PowerShell (or your terminal) and navigate to the folder:
 
 ```bash
 cd "c:\Users\test"
 python send_applications.py
 ```
 
+---
+
+## 🌐 Optional: Web Interface Deployment
+You can also run the application as a small web service so that you can use a
+browser to send individual emails or upload resumes. The easiest free hosting
+for Python apps is [PythonAnywhere](https://www.pythonanywhere.com/).
+
+### Deploying to PythonAnywhere (free tier)
+1. **Sign up** for an account and verify your email.
+2. **Clone your repo** on the PythonAnywhere Bash console:
+   ```bash
+   git clone https://github.com/nishantg98/email.git
+   cd email
+   pip install --user -r requirements.txt
+   ```
+3. **Create a new web app** in the Web tab (choose Flask, Python 3.10).
+4. **Edit the WSGI file** (click the link on the Web tab) and replace contents
+   with:
+   ```python
+   import sys, os
+   path = '/home/YOUR_USERNAME/email'
+   if path not in sys.path:
+       sys.path.append(path)
+
+   # set environment variables (free accounts)
+   os.environ.setdefault('YOUR_NAME', 'Your Name')
+   os.environ.setdefault('YOUR_EMAIL', 'youremail@gmail.com')
+   os.environ.setdefault('YOUR_PASSWORD', 'xxxx xxxx xxxx xxxx')
+   os.environ.setdefault('YOUR_PHONE', '+1234567890')
+   os.environ.setdefault('YOUR_LINKEDIN', 'https://linkedin.com/...')
+   os.environ.setdefault('YOUR_WEBSITE', 'https://your.site')
+
+   from app import app as application
+   ```
+5. **Reload** the web app and visit `https://YOUR_USERNAME.pythonanywhere.com`
+   to use the browser interface.
+6. Keep your free site alive by logging in at least once per month.
+
+> The app still uses Gmail SMTP and your App Password; nothing else is
+> required, and the web UI simply calls the same `email_sender_v2` logic.
+
+---
 ## 📧 Email Template
 
 The script sends a professional email with the following structure:
