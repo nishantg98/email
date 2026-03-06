@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Email Application Sender | {{ sender_name }}</title>
+  <meta name="description" content="Send job application emails instantly with resume attached">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body>
+
+  <!-- Animated Background -->
+  <div class="bg-animation">
+    <div class="orb"></div>
+    <div class="orb"></div>
+    <div class="orb"></div>
+  </div>
+
+  <!-- Toast Container -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <!-- Main Content -->
+  <div class="container">
+    <div class="card">
+
+      <!-- Header -->
+      <div class="header">
+        <div class="icon-wrapper">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+            stroke-linejoin="round">
+            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+            <polyline points="22,6 12,13 2,6" />
+          </svg>
+        </div>
+        <h1>Send Application</h1>
+        <p>Enter a recipient's email to send your DevOps resume &amp; cover letter instantly.</p>
+        <div class="sender-badge">
+          <span class="dot"></span>
+          Sending as {{ sender_name }}
+        </div>
+      </div>
+
+      <!-- Form -->
+      <form id="emailForm" autocomplete="off" enctype="multipart/form-data">
+        <!-- Email Input -->
+        <div class="form-group">
+          <label for="emailInput">Recipient Email Address</label>
+          <div class="input-wrapper">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+              stroke-linejoin="round">
+              <circle cx="12" cy="12" r="4" />
+              <path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-3.92 7.94" />
+            </svg>
+            <input type="email" id="emailInput" name="email" placeholder="hr@company.com" required autofocus>
+          </div>
+        </div>
+
+        <!-- Resume Upload -->
+        <div class="form-group">
+          <label>Resume (optional — uses default if not uploaded)</label>
+          <div class="file-upload-area" id="fileUploadArea">
+            <input type="file" id="resumeInput" name="resume" accept=".pdf,.doc,.docx" hidden>
+            <div class="file-upload-content" id="fileUploadContent">
+              <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="17 8 12 3 7 8" />
+                <line x1="12" y1="3" x2="12" y2="15" />
+              </svg>
+              <span class="upload-text">Click to upload or drag &amp; drop</span>
+              <span class="upload-hint">PDF, DOC, DOCX</span>
+            </div>
+            <div class="file-selected" id="fileSelected" style="display:none;">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                stroke-linejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <polyline points="14 2 14 8 20 8" />
+              </svg>
+              <span class="file-name" id="fileName"></span>
+              <button type="button" class="file-remove" id="fileRemove" title="Remove file">✕</button>
+            </div>
+          </div>
+          <div class="default-badge">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"
+              stroke-linejoin="round" width="14" height="14">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+              <polyline points="14 2 14 8 20 8" />
+            </svg>
+            <span id="defaultResumeName">Default: Nishant-DevOps-Resume.pdf</span>
+          </div>
+        </div>
+
+        <!-- Cover Letter -->
+        <div class="form-group">
+          <div class="label-row">
+            <label for="coverLetterInput">Cover Letter</label>
+            <button type="button" class="toggle-btn" id="toggleCoverLetter">
+              <span id="toggleText">Customize</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                stroke-linejoin="round" width="14" height="14">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+              </svg>
+            </button>
+          </div>
+          <div class="cover-letter-wrapper" id="coverLetterWrapper" style="display:none;">
+            <textarea id="coverLetterInput" name="cover_letter" rows="10"
+              placeholder="Write your cover letter here...">{{ default_cover_letter }}</textarea>
+            <button type="button" class="reset-btn" id="resetCoverLetter">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                stroke-linejoin="round" width="14" height="14">
+                <polyline points="1 4 1 10 7 10" />
+                <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+              </svg>
+              Reset to default
+            </button>
+          </div>
+          <div class="default-badge" id="coverLetterDefault">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"
+              stroke-linejoin="round" width="14" height="14">
+              <polyline points="22 4 12 14.01 9 11.01" />
+            </svg>
+            Using default cover letter
+          </div>
+        </div>
+
+        <button type="submit" class="btn-send" id="sendBtn">
+          <span id="btnIcon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+              stroke-linejoin="round">
+              <line x1="22" y1="2" x2="11" y2="13" />
+              <polygon points="22 2 15 22 11 13 2 9 22 2" />
+            </svg>
+          </span>
+          <div class="spinner" id="btnSpinner" style="display:none;"></div>
+          <span id="btnText">Send Application</span>
+        </button>
+      </form>
+
+      <!-- Sent History -->
+      <div class="history" id="historySection" style="display:none;">
+        <h3>Sent This Session</h3>
+        <ul class="history-list" id="historyList"></ul>
+      </div>
+
+    </div>
+
+    <div class="footer">
+      Powered by Flask &bull; Resume attached automatically
+    </div>
+  </div>
+
+  <!-- Pass default cover letter to JS -->
+  <script>
+    window.DEFAULT_COVER_LETTER = {{ default_cover_letter | tojson }};
+  </script>
+  <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+
+</html>
