@@ -14,17 +14,9 @@ YOUR_LINKEDIN = os.environ.get("YOUR_LINKEDIN", "https://www.linkedin.com/in/nis
 YOUR_WEBSITE = os.environ.get("YOUR_WEBSITE", "https://nishantg98.github.io/portfolio/")
 
 # Email Credentials
-# For Gmail: Set YOUR_PASSWORD as an environment variable (App Password)
-# For SendGrid: Set SENDGRID_API_KEY as an environment variable
-# Locally, set them in .env or environment variable
-# NEVER commit actual passwords to the repository
+# Gmail App Password required (16-character password from Google Account)
+# Get it from: https://myaccount.google.com/apppasswords
 YOUR_PASSWORD = os.environ.get("YOUR_PASSWORD", "")
-SENDGRID_API_KEY = os.environ.get("SENDGRID_API_KEY", "")
-
-# Email Service: 'sendgrid' (recommended for Render) or 'gmail'
-# Render: Use 'sendgrid' 
-# Local dev: Use 'gmail' (requires Gmail App Password)
-EMAIL_SERVICE = os.environ.get("EMAIL_SERVICE", "sendgrid" if SENDGRID_API_KEY else "gmail")
 
 # Resume Path
 RESUME_PATH = os.environ.get("RESUME_PATH", os.path.join(os.path.dirname(__file__), "Nishant-DevOps-Resume.pdf"))
