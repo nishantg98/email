@@ -7,6 +7,7 @@ import os
 from typing import List
 import time
 import socket
+import base64
 
 class JobApplicationEmailer:
     def __init__(self, sender_email: str, sender_password: str, sender_name: str, sender_phone: str = "", sender_linkedin: str = "", sender_website: str = ""):
@@ -80,21 +81,87 @@ Best regards,
                    hr_name: str = "Hiring Manager",
                    smtp_server: str = "smtp.gmail.com",
                    smtp_port: int = 587,
-                   timeout: int = 60) -> bool:
+                   timeout: int = 60,
+                   sendgrid_api_key: str = None,
+                   email_service: str = "gmail") -> bool:
         """
-        Send email to a single recipient with improved timeout handling
+        Send email to a single recipient with support for both Gmail SMTP and SendGrid API
 
         Args:
             recipient_email: HR email address
             resume_path: Path to your resume file
             hr_name: Name of the HR person
-            smtp_server: SMTP server address
-            smtp_port: SMTP port number
-            timeout: Connection timeout in seconds
+            smtp_server: SMTP server address (for Gmail)
+            smtp_port: SMTP port number (for Gmail)
+            timeout: Connection timeout in seconds (for Gmail)
+            sendgrid_api_key: SendGrid API key (if using SendGrid)
+            email_service: 'sendgrid' or 'gmail'
 
         Returns:
             True if successful, False otherwise
         """
+        # Use SendGrid if API key provided and service is set to sendgrid
+        if email_service == "sendgrid" and sendgrid_api_key:
+            return self._send_email_sendgrid(recipient_email, resume_path, hr_name, sendgrid_api_key)
+        else:
+            # Fall back to Gmail SMTP
+            return self._send_email_gmail(recipient_email, resume_path, hr_name, smtp_server, smtp_port, timeout)
+
+    def _send_email_sendgrid(self, recipient_email: str, resume_path: str, hr_name: str, api_key: str) -> bool:
+        """Send email using SendGrid API"""
+        try:
+            from sendgrid import SendGridAPIClient
+            from sendgrid.helpers.mail import Mail, Attachment, FileContent, FileName, FileType, Disposition
+
+            print(f"  [1/3] Creating email message...")
+            
+            # Create message
+            body = self.create_email_body(hr_name)
+            message = Mail(
+                from_email=f"{self.sender_name} <{self.sender_email}>",
+                to_emails=recipient_email,
+                subject=f"Application for DevOps Engineer Position - {self.sender_name}",
+                plain_text_content=body
+            )
+
+            print(f"  [2/3] Attaching resume...")
+            # Attach resume
+            if os.path.exists(resume_path):
+                with open(resume_path, 'rb') as attachment_file:
+                    attachment_data = base64.b64encode(attachment_file.read()).decode()
+                
+                filename = os.path.basename(resume_path)
+                attachment = Attachment(
+                    FileContent(attachment_data),
+                    FileName(filename),
+                    FileType('application/pdf'),
+                    Disposition('attachment')
+                )
+                message.add_attachment(attachment)
+            else:
+                print(f"  [ERROR] Resume file not found at {resume_path}")
+                return False
+
+            print(f"  [3/3] Sending via SendGrid...")
+            sg = SendGridAPIClient(api_key)
+            response = sg.send(message)
+            
+            if 200 <= response.status_code < 300:
+                print(f"[SUCCESS] Email sent to {recipient_email} via SendGrid")
+                return True
+            else:
+                print(f"[FAILED] SendGrid error for {recipient_email}: Status {response.status_code}")
+                return False
+
+        except ImportError:
+            print("[ERROR] sendgrid package not installed. Run: pip install sendgrid")
+            return False
+        except Exception as e:
+            print(f"[FAILED] SendGrid error for {recipient_email}: {str(e)}")
+            return False
+
+    def _send_email_gmail(self, recipient_email: str, resume_path: str, hr_name: str, smtp_server: str, smtp_port: int, timeout: int) -> bool:
+        """Send email using Gmail SMTP"""
         # Set default socket timeout
         socket.setdefaulttimeout(timeout)
 

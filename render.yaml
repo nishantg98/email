@@ -17,5 +17,9 @@ services:
         sync: false
       - key: YOUR_WEBSITE
         sync: false
+      - key: SENDGRID_API_KEY
+        sync: false
+      - key: EMAIL_SERVICE
+        value: sendgrid
       - key: PYTHON_VERSION
         value: 3.11.0

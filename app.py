@@ -89,7 +89,9 @@ def send_email():
             resume_path=resume_path,
             smtp_server=config.SMTP_SERVER,
             smtp_port=config.SMTP_PORT,
-            timeout=60
+            timeout=60,
+            sendgrid_api_key=config.SENDGRID_API_KEY,
+            email_service=config.EMAIL_SERVICE
         )
     finally:
         # Clean up temp file
