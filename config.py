@@ -48,9 +48,9 @@ SKILL_HIGHLIGHTS = [
 APPLICATION_DETAILS = {
     "Total Experience": "4.6 years",
     "Rel Experience": "4.6 years",
-    "Current CTC": "14.7 lpa",
-    "Expected CTC": "20 to 22 lpa (negotiable)",
-    "Notice Period": "30 days (negotiable)",
+    "Current CTC": "",
+    "Expected CTC": "",
+    "Notice Period": "30 days",
     "Current Location": "Delhi NCR",
     "Open to Relocate": "Yes",
 }
