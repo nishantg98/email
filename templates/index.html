@@ -48,15 +48,48 @@
       <!-- Form -->
       <form id="emailForm" autocomplete="off" enctype="multipart/form-data">
         <!-- Email Input -->
-        <div class="form-group">
-          <label for="emailInput">Recipient Email Address</label>
+        <div class="form-group" id="singleEmailGroup">
+          <div class="label-row">
+            <label for="emailInput">Recipient Email Address</label>
+            <button type="button" class="toggle-btn" id="toggleBulkMode">
+              <span id="bulkToggleText">Send to multiple</span>
+            </button>
+          </div>
           <div class="input-wrapper">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
               stroke-linejoin="round">
               <circle cx="12" cy="12" r="4" />
               <path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-3.92 7.94" />
             </svg>
-            <input type="email" id="emailInput" name="email" placeholder="hr@company.com" required autofocus>
+            <input type="email" id="emailInput" name="email" placeholder="hr@company.com" autofocus>
+          </div>
+        </div>
+
+        <!-- Bulk Emails Input (hidden by default) -->
+        <div class="form-group" id="bulkEmailGroup" style="display:none;">
+          <div class="label-row">
+            <label for="bulkEmailsInput">Recipient Emails (one per line, up to 25)</label>
+            <button type="button" class="toggle-btn" id="toggleSingleMode">
+              <span>Send to one</span>
+            </button>
+          </div>
+          <textarea id="bulkEmailsInput" name="emails" rows="5"
+            placeholder="hr1@company.com&#10;hr2@company.com&#10;hr3@company.com"></textarea>
+        </div>
+
+        <!-- HR Name / Company (optional personalization) -->
+        <div class="form-group two-col">
+          <div>
+            <label for="hrNameInput">HR Name (optional)</label>
+            <div class="input-wrapper no-icon">
+              <input type="text" id="hrNameInput" name="hr_name" placeholder="Jane Doe">
+            </div>
+          </div>
+          <div>
+            <label for="companyInput">Company (optional)</label>
+            <div class="input-wrapper no-icon">
+              <input type="text" id="companyInput" name="company" placeholder="Acme Corp">
+            </div>
           </div>
         </div>
 

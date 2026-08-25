@@ -8,6 +8,15 @@ const btnIcon = document.getElementById('btnIcon');
 const toastContainer = document.getElementById('toastContainer');
 const historySection = document.getElementById('historySection');
 const historyList = document.getElementById('historyList');
+const hrNameInput = document.getElementById('hrNameInput');
+const companyInput = document.getElementById('companyInput');
+
+// Bulk mode elements
+const singleEmailGroup = document.getElementById('singleEmailGroup');
+const bulkEmailGroup = document.getElementById('bulkEmailGroup');
+const bulkEmailsInput = document.getElementById('bulkEmailsInput');
+const toggleBulkMode = document.getElementById('toggleBulkMode');
+const toggleSingleMode = document.getElementById('toggleSingleMode');
 
 // Resume elements
 const fileUploadArea = document.getElementById('fileUploadArea');
@@ -26,8 +35,31 @@ const coverLetterDefault = document.getElementById('coverLetterDefault');
 const resetCoverLetter = document.getElementById('resetCoverLetter');
 
 // ===== State =====
-const sentHistory = [];
+const HISTORY_KEY = 'jobAppSentHistory';
+let sentHistory = loadHistory();
 let coverLetterOpen = false;
+let bulkMode = false;
+
+function loadHistory() {
+    try {
+        return JSON.parse(localStorage.getItem(HISTORY_KEY)) || [];
+    } catch (e) {
+        return [];
+    }
+}
+
+function saveHistory() {
+    try {
+        // Keep the list from growing unbounded
+        localStorage.setItem(HISTORY_KEY, JSON.stringify(sentHistory.slice(0, 200)));
+    } catch (e) {
+        // localStorage may be unavailable (e.g. private browsing quota) — fail silently
+    }
+}
+
+function hasAlreadySentTo(email) {
+    return sentHistory.some(item => item.success && item.email.toLowerCase() === email.toLowerCase());
+}
 
 // ===== Email Validation =====
 function isValidEmail(email) {
@@ -97,6 +129,23 @@ fileRemove.addEventListener('click', (e) => {
     clearSelectedFile();
 });
 
+// ===== Bulk Mode Toggle =====
+toggleBulkMode.addEventListener('click', () => {
+    bulkMode = true;
+    singleEmailGroup.style.display = 'none';
+    bulkEmailGroup.style.display = 'block';
+    emailInput.value = '';
+    bulkEmailsInput.focus();
+});
+
+toggleSingleMode.addEventListener('click', () => {
+    bulkMode = false;
+    bulkEmailGroup.style.display = 'none';
+    singleEmailGroup.style.display = 'block';
+    bulkEmailsInput.value = '';
+    emailInput.focus();
+});
+
 // ===== Cover Letter Toggle =====
 toggleCoverLetter.addEventListener('click', () => {
     coverLetterOpen = !coverLetterOpen;
@@ -111,8 +160,9 @@ resetCoverLetter.addEventListener('click', () => {
 });
 
 // ===== History =====
-function addToHistory(email, success) {
-    sentHistory.unshift({ email, success, time: new Date() });
+function addToHistory(email, success, message = '') {
+    sentHistory.unshift({ email, success, message, time: new Date().toISOString() });
+    saveHistory();
     renderHistory();
 }
 
@@ -123,15 +173,35 @@ function renderHistory() {
     }
 
     historySection.style.display = 'block';
-    historyList.innerHTML = sentHistory.map(item => `
+    historyList.innerHTML = sentHistory.map((item, index) => `
     <li class="history-item">
-      <span class="email">${item.email}</span>
-      <span class="status ${item.success ? 'sent' : 'failed'}">
-        ${item.success ? '✓ Sent' : '✗ Failed'}
+      <span class="email" title="${item.message ? item.message.replace(/"/g, '&quot;') : ''}">${item.email}</span>
+      <span class="history-actions">
+        <span class="status ${item.success ? 'sent' : 'failed'}">
+          ${item.success ? '✓ Sent' : '✗ Failed'}
+        </span>
+        ${!item.success ? `<button type="button" class="retry-btn" data-index="${index}" title="Refill this email to retry">Retry</button>` : ''}
       </span>
     </li>
   `).join('');
 }
+
+historyList.addEventListener('click', (e) => {
+    const btn = e.target.closest('.retry-btn');
+    if (!btn) return;
+    const item = sentHistory[Number(btn.dataset.index)];
+    if (!item) return;
+
+    if (bulkMode) {
+        toggleSingleMode.click();
+    }
+    emailInput.value = item.email;
+    emailInput.focus();
+    window.scrollTo({ top: form.offsetTop - 40, behavior: 'smooth' });
+});
+
+// Render any history restored from localStorage on page load
+renderHistory();
 
 // ===== Sending State =====
 function setLoading(loading) {
@@ -142,9 +212,110 @@ function setLoading(loading) {
     btnIcon.style.display = loading ? 'none' : 'block';
 }
 
+function buildSharedFormData() {
+    const formData = new FormData();
+    if (resumeInput.files.length > 0) {
+        formData.append('resume', resumeInput.files[0]);
+    }
+    if (coverLetterOpen) {
+        formData.append('cover_letter', coverLetterInput.value);
+    }
+    if (hrNameInput.value.trim()) {
+        formData.append('hr_name', hrNameInput.value.trim());
+    }
+    if (companyInput.value.trim()) {
+        formData.append('company', companyInput.value.trim());
+    }
+    return formData;
+}
+
+async function submitSingle(email) {
+    if (hasAlreadySentTo(email)) {
+        const proceed = confirm(`You already sent an application to ${email} before. Send again anyway?`);
+        if (!proceed) return;
+    }
+
+    setLoading(true);
+    try {
+        const formData = buildSharedFormData();
+        formData.append('email', email);
+
+        const response = await fetch('/send', { method: 'POST', body: formData });
+        const data = await response.json();
+
+        showToast(data.message, data.success ? 'success' : 'error');
+        addToHistory(email, data.success, data.message);
+        if (data.success) emailInput.value = '';
+    } catch (err) {
+        showToast('Network error. Please check if the server is running.', 'error');
+        addToHistory(email, false, 'Network error');
+    } finally {
+        setLoading(false);
+        emailInput.focus();
+    }
+}
+
+async function submitBulk(emails) {
+    const newRecipients = emails.filter(email => !hasAlreadySentTo(email));
+    const alreadySentCount = emails.length - newRecipients.length;
+
+    if (newRecipients.length === 0) {
+        showToast('All of these recipients already have a successful send in your history.', 'error');
+        return;
+    }
+
+    if (alreadySentCount > 0) {
+        const proceed = confirm(`${alreadySentCount} of these emails were already sent successfully before. Continue with the remaining ${newRecipients.length}?`);
+        if (!proceed) return;
+    }
+
+    setLoading(true);
+    try {
+        const formData = buildSharedFormData();
+        formData.append('emails', newRecipients.join('\n'));
+
+        const response = await fetch('/send-bulk', { method: 'POST', body: formData });
+        const data = await response.json();
+
+        if (Array.isArray(data.results)) {
+            data.results.forEach(r => addToHistory(r.email, r.success, r.message));
+        }
+        showToast(data.message, data.success ? 'success' : 'error');
+        if (data.success) bulkEmailsInput.value = '';
+    } catch (err) {
+        showToast('Network error. Please check if the server is running.', 'error');
+    } finally {
+        setLoading(false);
+    }
+}
+
 // ===== Form Submit =====
 form.addEventListener('submit', async (e) => {
     e.preventDefault();
+
+    if (bulkMode) {
+        const emails = bulkEmailsInput.value
+            .split(/[\n,]/)
+            .map(x => x.trim())
+            .filter(Boolean);
+
+        if (emails.length === 0) {
+            showToast('Please enter at least one email address.', 'error');
+            bulkEmailsInput.focus();
+            return;
+        }
+
+        const invalid = emails.filter(email => !isValidEmail(email));
+        if (invalid.length > 0) {
+            showToast(`Invalid email address: ${invalid[0]}`, 'error');
+            bulkEmailsInput.focus();
+            return;
+        }
+
+        await submitBulk(emails);
+        return;
+    }
+
     const email = emailInput.value.trim();
 
     if (!email) {
@@ -159,42 +330,5 @@ form.addEventListener('submit', async (e) => {
         return;
     }
 
-    setLoading(true);
-
-    try {
-        const formData = new FormData();
-        formData.append('email', email);
-
-        // Append resume if uploaded
-        if (resumeInput.files.length > 0) {
-            formData.append('resume', resumeInput.files[0]);
-        }
-
-        // Append cover letter if customized
-        if (coverLetterOpen) {
-            formData.append('cover_letter', coverLetterInput.value);
-        }
-
-        const response = await fetch('/send', {
-            method: 'POST',
-            body: formData
-        });
-
-        const data = await response.json();
-
-        if (data.success) {
-            showToast(data.message, 'success');
-            addToHistory(email, true);
-            emailInput.value = '';
-        } else {
-            showToast(data.message, 'error');
-            addToHistory(email, false);
-        }
-    } catch (err) {
-        showToast('Network error. Please check if the server is running.', 'error');
-        addToHistory(email, false);
-    } finally {
-        setLoading(false);
-        emailInput.focus();
-    }
+    await submitSingle(email);
 });

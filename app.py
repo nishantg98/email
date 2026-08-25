@@ -8,6 +8,7 @@ import config
 import os
 import re
 import tempfile
+import time
 
 app = Flask(__name__)
 
@@ -37,38 +38,23 @@ def index():
     )
 
 
-@app.route('/send', methods=['POST'])
-def send_email():
-    """Handle email sending with optional resume upload and custom cover letter"""
-    recipient_email = request.form.get('email', '').strip()
-    custom_cover_letter = request.form.get('cover_letter', '').strip()
-    uploaded_resume = request.files.get('resume')
+EMAIL_REGEX = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+MAX_BULK_RECIPIENTS = 25
 
-    # Validate email
-    if not recipient_email:
-        return jsonify({'success': False, 'message': 'Please enter an email address.'}), 400
 
-    email_regex = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-    if not re.match(email_regex, recipient_email):
-        return jsonify({'success': False, 'message': 'Please enter a valid email address.'}), 400
-
-    # Determine which resume to use
-    resume_path = config.RESUME_PATH
-    temp_resume_path = None
-
+def _resolve_resume_path(uploaded_resume):
+    """Save an uploaded resume to a temp file, or fall back to the configured default.
+    Returns (resume_path, temp_resume_path_or_None)."""
     if uploaded_resume and uploaded_resume.filename:
-        # Save uploaded resume to a temp file
         ext = os.path.splitext(uploaded_resume.filename)[1]
         temp_fd, temp_resume_path = tempfile.mkstemp(suffix=ext)
         os.close(temp_fd)
         uploaded_resume.save(temp_resume_path)
-        resume_path = temp_resume_path
+        return temp_resume_path, temp_resume_path
+    return config.RESUME_PATH, None
 
-    # Check resume exists
-    if not os.path.exists(resume_path):
-        return jsonify({'success': False, 'message': 'Resume file not found. Please upload one or check config.py.'}), 500
 
-    # Create emailer
+def _build_emailer(custom_cover_letter):
     emailer = JobApplicationEmailer(
         sender_email=config.YOUR_EMAIL,
         sender_password=config.YOUR_PASSWORD,
@@ -77,39 +63,132 @@ def send_email():
         sender_linkedin=config.YOUR_LINKEDIN,
         sender_website=config.YOUR_WEBSITE
     )
-
-    # If custom cover letter provided, override the email body method
     if custom_cover_letter:
-        original_create_body = emailer.create_email_body
         emailer.create_email_body = lambda hr_name="Hiring Manager": custom_cover_letter
+    return emailer
+
+
+@app.route('/send', methods=['POST'])
+def send_email():
+    """Handle email sending with optional resume upload and custom cover letter"""
+    recipient_email = request.form.get('email', '').strip()
+    custom_cover_letter = request.form.get('cover_letter', '').strip()
+    hr_name = request.form.get('hr_name', '').strip()
+    company = request.form.get('company', '').strip()
+    uploaded_resume = request.files.get('resume')
+
+    # Validate email
+    if not recipient_email:
+        return jsonify({'success': False, 'message': 'Please enter an email address.'}), 400
+
+    if not re.match(EMAIL_REGEX, recipient_email):
+        return jsonify({'success': False, 'message': 'Please enter a valid email address.'}), 400
+
+    resume_path, temp_resume_path = _resolve_resume_path(uploaded_resume)
+
+    if not os.path.exists(resume_path):
+        return jsonify({'success': False, 'message': 'Resume file not found. Please upload one or check config.py.'}), 500
+
+    emailer = _build_emailer(custom_cover_letter)
+
+    greeting_name = hr_name or (f"the {company} team" if company else "Hiring Manager")
 
     try:
-        success = emailer.send_email(
+        result = emailer.send_email(
             recipient_email=recipient_email,
             resume_path=resume_path,
+            hr_name=greeting_name,
             smtp_server=config.SMTP_SERVER,
             smtp_port=config.SMTP_PORT,
             timeout=60
         )
     finally:
-        # Clean up temp file
         if temp_resume_path and os.path.exists(temp_resume_path):
             os.remove(temp_resume_path)
 
-    if success:
-        return jsonify({
-            'success': True,
-            'message': f'Application sent successfully to {recipient_email}!'
-        })
-    else:
+    if result.success:
+        return jsonify({'success': True, 'message': result.message})
+    return jsonify({'success': False, 'message': result.message}), 500
+
+
+@app.route('/send-bulk', methods=['POST'])
+def send_bulk():
+    """Send the same application to a list of recipients, one at a time."""
+    raw_emails = request.form.get('emails', '')
+    custom_cover_letter = request.form.get('cover_letter', '').strip()
+    hr_name = request.form.get('hr_name', '').strip()
+    company = request.form.get('company', '').strip()
+    uploaded_resume = request.files.get('resume')
+
+    # Split on commas/newlines, dedupe, validate
+    candidates = [e.strip() for e in re.split(r'[,\n]', raw_emails) if e.strip()]
+    seen = set()
+    recipients = []
+    invalid = []
+    for email in candidates:
+        if email in seen:
+            continue
+        seen.add(email)
+        if re.match(EMAIL_REGEX, email):
+            recipients.append(email)
+        else:
+            invalid.append(email)
+
+    if not recipients:
+        return jsonify({'success': False, 'message': 'No valid email addresses were provided.'}), 400
+
+    if len(recipients) > MAX_BULK_RECIPIENTS:
         return jsonify({
             'success': False,
-            'message': f'Failed to send email to {recipient_email}. Check server logs for details.'
-        }), 500
+            'message': f'Too many recipients ({len(recipients)}). Limit is {MAX_BULK_RECIPIENTS} per batch to avoid request timeouts.'
+        }), 400
+
+    resume_path, temp_resume_path = _resolve_resume_path(uploaded_resume)
+
+    if not os.path.exists(resume_path):
+        return jsonify({'success': False, 'message': 'Resume file not found. Please upload one or check config.py.'}), 500
+
+    emailer = _build_emailer(custom_cover_letter)
+    greeting_name = hr_name or (f"the {company} team" if company else "Hiring Manager")
+
+    results = []
+    try:
+        for i, recipient_email in enumerate(recipients):
+            result = emailer.send_email(
+                recipient_email=recipient_email,
+                resume_path=resume_path,
+                hr_name=greeting_name,
+                smtp_server=config.SMTP_SERVER,
+                smtp_port=config.SMTP_PORT,
+                timeout=60
+            )
+            results.append({'email': recipient_email, 'success': result.success, 'message': result.message})
+            if i < len(recipients) - 1:
+                time.sleep(config.DELAY_BETWEEN_EMAILS)
+    finally:
+        if temp_resume_path and os.path.exists(temp_resume_path):
+            os.remove(temp_resume_path)
+
+    for email in invalid:
+        results.append({'email': email, 'success': False, 'message': 'Invalid email address, skipped.'})
+
+    sent = sum(1 for r in results if r['success'])
+    return jsonify({
+        'success': sent > 0,
+        'message': f'Sent {sent}/{len(recipients)} emails successfully.',
+        'results': results
+    })
 
 
 if __name__ == '__main__':
     import socket
+    import sys
+
+    # Windows consoles often default to cp1252, which can't encode the emoji
+    # below and crashes the print before the server even starts.
+    if hasattr(sys.stdout, 'reconfigure'):
+        sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+
     # Get local IP for network access
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:

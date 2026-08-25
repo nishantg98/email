@@ -284,6 +284,39 @@ body {
   color: var(--accent-3);
 }
 
+/* ===== Two-Column Fields (HR Name / Company) ===== */
+.form-group.two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.input-wrapper.no-icon input {
+  padding-left: 16px;
+}
+
+/* ===== Bulk Emails Textarea ===== */
+#bulkEmailsInput {
+  width: 100%;
+  padding: 14px 16px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--glass-border);
+  border-radius: 14px;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 0.85rem;
+  line-height: 1.6;
+  outline: none;
+  resize: vertical;
+  transition: all 0.3s ease;
+}
+
+#bulkEmailsInput:focus {
+  border-color: var(--accent-1);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+  background: rgba(255, 255, 255, 0.06);
+}
+
 /* ===== Button ===== */
 .btn-send {
   width: 100%;
@@ -475,6 +508,36 @@ body {
 
 .history-item .email {
   color: var(--text-secondary);
+}
+
+.history-item .email {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.history-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.retry-btn {
+  background: rgba(99, 102, 241, 0.12);
+  border: 1px solid rgba(99, 102, 241, 0.25);
+  color: var(--accent-3);
+  font-family: inherit;
+  font-size: 0.7rem;
+  font-weight: 500;
+  padding: 3px 9px;
+  border-radius: 100px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.retry-btn:hover {
+  background: rgba(99, 102, 241, 0.25);
 }
 
 .history-item .status {

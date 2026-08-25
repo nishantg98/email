@@ -3,10 +3,37 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
 from email import encoders
+from dataclasses import dataclass
 import os
 from typing import List
 import time
 import socket
+
+# PythonAnywhere sandboxes have no outbound IPv6 route, but smtp.gmail.com
+# publishes AAAA records too. Forcing IPv4-only resolution avoids
+# intermittent "[Errno 101] Network is unreachable" when DNS returns an
+# IPv6 address for the SMTP host.
+_original_getaddrinfo = socket.getaddrinfo
+
+
+def _ipv4_only_getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
+    return _original_getaddrinfo(host, port, socket.AF_INET, type, proto, flags)
+
+
+socket.getaddrinfo = _ipv4_only_getaddrinfo
+
+
+@dataclass
+class SendResult:
+    """Outcome of a single send attempt. Truthy/falsy on `success` so
+    existing `if emailer.send_email(...)` call sites keep working."""
+    success: bool
+    message: str = ""
+    attempts: int = 1
+
+    def __bool__(self):
+        return self.success
+
 
 class JobApplicationEmailer:
     def __init__(self, sender_email: str, sender_password: str, sender_name: str, sender_phone: str = "", sender_linkedin: str = "", sender_website: str = ""):
@@ -80,7 +107,9 @@ Best regards,
                    hr_name: str = "Hiring Manager",
                    smtp_server: str = "smtp.gmail.com",
                    smtp_port: int = 587,
-                   timeout: int = 60) -> bool:
+                   timeout: int = 60,
+                   max_retries: int = 3,
+                   retry_delay: int = 5) -> SendResult:
         """
         Send email to a single recipient using Gmail SMTP
 
@@ -91,88 +120,89 @@ Best regards,
             smtp_server: SMTP server address
             smtp_port: SMTP port number
             timeout: Connection timeout in seconds
+            max_retries: Number of attempts for transient network/connection errors
+            retry_delay: Seconds to wait between retries
 
         Returns:
-            True if successful, False otherwise
+            SendResult with a success flag, a human-readable reason, and the attempt count
         """
-        # Set default socket timeout
-        socket.setdefaulttimeout(timeout)
+        print(f"  [1/5] Creating email message...")
+        # Create message
+        message = MIMEMultipart()
+        message['From'] = f"{self.sender_name} <{self.sender_email}>"
+        message['To'] = recipient_email
+        message['Subject'] = f"Application for DevOps Engineer Position - {self.sender_name}"
 
-        try:
-            print(f"  [1/5] Creating email message...")
-            # Create message
-            message = MIMEMultipart()
-            message['From'] = f"{self.sender_name} <{self.sender_email}>"
-            message['To'] = recipient_email
-            message['Subject'] = f"Application for DevOps Engineer Position - {self.sender_name}"
+        # Add body
+        body = self.create_email_body(hr_name)
+        message.attach(MIMEText(body, 'plain'))
 
-            # Add body
-            body = self.create_email_body(hr_name)
-            message.attach(MIMEText(body, 'plain'))
+        print(f"  [2/5] Attaching resume...")
+        # Attach resume
+        if os.path.exists(resume_path):
+            with open(resume_path, 'rb') as attachment:
+                part = MIMEBase('application', 'octet-stream')
+                part.set_payload(attachment.read())
 
-            print(f"  [2/5] Attaching resume...")
-            # Attach resume
-            if os.path.exists(resume_path):
-                with open(resume_path, 'rb') as attachment:
-                    part = MIMEBase('application', 'octet-stream')
-                    part.set_payload(attachment.read())
+            encoders.encode_base64(part)
+            filename = os.path.basename(resume_path)
+            part.add_header(
+                'Content-Disposition',
+                f'attachment; filename= {filename}'
+            )
+            message.attach(part)
+        else:
+            print(f"  [ERROR] Resume file not found at {resume_path}")
+            return SendResult(False, f"Resume file not found: {resume_path}")
 
-                encoders.encode_base64(part)
-                filename = os.path.basename(resume_path)
-                part.add_header(
-                    'Content-Disposition',
-                    f'attachment; filename= {filename}'
-                )
-                message.attach(part)
-            else:
-                print(f"  [ERROR] Resume file not found at {resume_path}")
-                return False
+        for attempt in range(1, max_retries + 1):
+            try:
+                print(f"  [3/5] Connecting to {smtp_server}:{smtp_port}... (attempt {attempt}/{max_retries})")
+                server = smtplib.SMTP(smtp_server, smtp_port, timeout=timeout)
+                server.set_debuglevel(0)
 
-            print(f"  [3/5] Connecting to {smtp_server}:{smtp_port}...")
-            # Connect to server with increased timeout
-            server = smtplib.SMTP(smtp_server, smtp_port, timeout=timeout)
-            server.set_debuglevel(0)
+                print(f"  [4/5] Starting TLS encryption...")
+                server.starttls()
 
-            print(f"  [4/5] Starting TLS encryption...")
-            server.starttls()
+                print(f"  [5/5] Logging in and sending...")
+                server.login(self.sender_email, self.sender_password)
+                server.send_message(message)
+                server.quit()
 
-            print(f"  [5/5] Logging in and sending...")
-            server.login(self.sender_email, self.sender_password)
-            server.send_message(message)
-            server.quit()
+                print(f"[SUCCESS] Email sent to {recipient_email}")
+                suffix = f" (succeeded on attempt {attempt}/{max_retries})" if attempt > 1 else ""
+                return SendResult(True, f"Email sent successfully{suffix}.", attempt)
 
-            print(f"[SUCCESS] Email sent to {recipient_email}")
-            return True
+            except smtplib.SMTPAuthenticationError as e:
+                # Bad credentials won't fix themselves on retry
+                print(f"[FAILED] Authentication error for {recipient_email}")
+                print(f"  Error: {str(e)}")
+                print(f"  Check your App Password in config.py")
+                return SendResult(False, "Gmail rejected the sender login — check the App Password in config.py.", attempt)
 
-        except smtplib.SMTPAuthenticationError as e:
-            print(f"[FAILED] Authentication error for {recipient_email}")
-            print(f"  Error: {str(e)}")
-            print(f"  Check your App Password in config.py")
-            return False
+            except smtplib.SMTPRecipientsRefused as e:
+                print(f"[FAILED] Recipient refused for {recipient_email}: {str(e)}")
+                return SendResult(False, "The recipient address was rejected by the mail server.", attempt)
 
-        except smtplib.SMTPException as e:
-            print(f"[FAILED] SMTP error for {recipient_email}: {str(e)}")
-            return False
+            except (socket.timeout, socket.error, smtplib.SMTPServerDisconnected, smtplib.SMTPConnectError) as e:
+                # Transient connection issues (e.g. brief network unreachability) are worth retrying
+                print(f"[RETRY] Connection issue for {recipient_email} on attempt {attempt}/{max_retries}: {str(e)}")
+                if attempt == max_retries:
+                    print(f"[FAILED] Giving up on {recipient_email} after {max_retries} attempts")
+                    return SendResult(False, f"Connection issue after {max_retries} attempts: {str(e)}", attempt)
+                time.sleep(retry_delay)
 
-        except socket.timeout:
-            print(f"[FAILED] Connection timeout for {recipient_email}")
-            print(f"  The server took too long to respond (>{timeout}s)")
-            print(f"  Try again or increase timeout value")
-            return False
+            except smtplib.SMTPException as e:
+                print(f"[FAILED] SMTP error for {recipient_email}: {str(e)}")
+                return SendResult(False, f"SMTP error: {str(e)}", attempt)
 
-        except socket.error as e:
-            print(f"[FAILED] Socket error for {recipient_email}: {str(e)}")
-            return False
+            except Exception as e:
+                print(f"[FAILED] Unexpected error for {recipient_email}")
+                print(f"  Error type: {type(e).__name__}")
+                print(f"  Error: {str(e)}")
+                return SendResult(False, f"Unexpected error: {str(e)}", attempt)
 
-        except Exception as e:
-            print(f"[FAILED] Unexpected error for {recipient_email}")
-            print(f"  Error type: {type(e).__name__}")
-            print(f"  Error: {str(e)}")
-            return False
-
-        finally:
-            # Reset socket timeout
-            socket.setdefaulttimeout(None)
+        return SendResult(False, "Failed to send after retries.", max_retries)
 
     def send_bulk_emails(self,
                         hr_emails: List[str],
