@@ -19,7 +19,7 @@ YOUR_WEBSITE = os.environ.get("YOUR_WEBSITE", "https://nishantg98.github.io/port
 YOUR_PASSWORD = os.environ.get("YOUR_PASSWORD", "")
 
 # Resume Path
-RESUME_PATH = os.environ.get("RESUME_PATH", os.path.join(os.path.dirname(__file__), "Nishant-DevOps-Resume.pdf"))
+RESUME_PATH = os.environ.get("RESUME_PATH", os.path.join(os.path.dirname(__file__), "Nishant_Gupta_Resume.pdf"))
 
 # SMTP Server Configuration
 SMTP_SERVER = os.environ.get("SMTP_SERVER", "smtp.gmail.com")
