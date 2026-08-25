@@ -35,16 +35,30 @@ def _log_sent_email(email, success, message, hr_name='', company=''):
         })
 
 
+def _profile_kwargs():
+    """Sender profile + application content, read from config.py so this app
+    works for anyone who fills in their own config — not just DevOps roles.
+    Uses getattr() defaults so older config.py files without these fields still work."""
+    return {
+        'sender_email': config.YOUR_EMAIL,
+        'sender_password': config.YOUR_PASSWORD,
+        'sender_name': config.YOUR_NAME,
+        'sender_phone': config.YOUR_PHONE,
+        'sender_linkedin': config.YOUR_LINKEDIN,
+        'sender_website': config.YOUR_WEBSITE,
+        'target_role': getattr(config, 'TARGET_ROLE', 'DevOps Engineer'),
+        'experience_summary': getattr(
+            config, 'EXPERIENCE_SUMMARY',
+            '4+ years of proven track record in cloud infrastructure, automation, and CI/CD pipelines'
+        ),
+        'skill_highlights': getattr(config, 'SKILL_HIGHLIGHTS', None),
+        'application_details': getattr(config, 'APPLICATION_DETAILS', {}),
+    }
+
+
 def get_default_cover_letter():
     """Generate the default cover letter text from the emailer"""
-    emailer = JobApplicationEmailer(
-        sender_email=config.YOUR_EMAIL,
-        sender_password=config.YOUR_PASSWORD,
-        sender_name=config.YOUR_NAME,
-        sender_phone=config.YOUR_PHONE,
-        sender_linkedin=config.YOUR_LINKEDIN,
-        sender_website=config.YOUR_WEBSITE
-    )
+    emailer = JobApplicationEmailer(**_profile_kwargs())
     return emailer.create_email_body("Hiring Manager")
 
 
@@ -89,14 +103,7 @@ def _greeting_name(hr_name, company, recipient_email):
 
 
 def _build_emailer(custom_cover_letter):
-    emailer = JobApplicationEmailer(
-        sender_email=config.YOUR_EMAIL,
-        sender_password=config.YOUR_PASSWORD,
-        sender_name=config.YOUR_NAME,
-        sender_phone=config.YOUR_PHONE,
-        sender_linkedin=config.YOUR_LINKEDIN,
-        sender_website=config.YOUR_WEBSITE
-    )
+    emailer = JobApplicationEmailer(**_profile_kwargs())
     if custom_cover_letter:
         emailer.create_email_body = lambda hr_name="Hiring Manager", jd_text="", company="": custom_cover_letter
     return emailer

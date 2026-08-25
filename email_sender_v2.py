@@ -63,7 +63,12 @@ class SendResult:
 
 
 class JobApplicationEmailer:
-    def __init__(self, sender_email: str, sender_password: str, sender_name: str, sender_phone: str = "", sender_linkedin: str = "", sender_website: str = ""):
+    def __init__(self, sender_email: str, sender_password: str, sender_name: str,
+                 sender_phone: str = "", sender_linkedin: str = "", sender_website: str = "",
+                 target_role: str = "DevOps Engineer",
+                 experience_summary: str = "4+ years of proven track record in cloud infrastructure, automation, and CI/CD pipelines",
+                 skill_highlights: List[str] = None,
+                 application_details: dict = None):
         """
         Initialize the email sender
 
@@ -74,6 +79,14 @@ class JobApplicationEmailer:
             sender_phone: Your phone number (optional)
             sender_linkedin: Your LinkedIn profile URL (optional)
             sender_website: Your portfolio/website URL (optional)
+            target_role: The role you're applying for, used in the subject line and intro
+            experience_summary: One-clause summary of your experience, used in the intro sentence
+            skill_highlights: Optional list of your own bullet strings (e.g. "Proficient in Java, Spring Boot").
+                               If omitted, falls back to a generic DevOps skill set. JD-matching keywords are
+                               derived automatically from each bullet's text — no manual tagging required.
+            application_details: Optional ordered dict of extra details to list at the end of the email
+                                  (e.g. {"Total Experience": "4 years", "Notice Period": "30 days"}).
+                                  Omitted entirely from the email if empty/None.
         """
         self.sender_email = sender_email
         self.sender_password = sender_password
@@ -81,9 +94,59 @@ class JobApplicationEmailer:
         self.sender_phone = sender_phone
         self.sender_linkedin = sender_linkedin
         self.sender_website = sender_website
+        self.target_role = target_role
+        self.experience_summary = experience_summary
+        self.application_details = application_details or {}
+        self.skill_categories = (
+            self._build_skill_categories(skill_highlights) if skill_highlights else self.DEFAULT_SKILL_CATEGORIES
+        )
+
+    _LEAD_IN_PATTERNS = [
+        r'^expertise in\s+', r'^proficient in\s+', r'^strong experience (with|in)\s+',
+        r'^experience (with|in)\s+', r'^skilled in\s+', r'^knowledge of\s+', r'^hands-on experience (with|in)\s+',
+    ]
+    _KEYWORD_STOPWORDS = {
+        "and", "with", "the", "in", "of", "for", "using", "on", "to", "a", "an", "my",
+        "strong", "expertise", "proficient", "experience", "skilled", "knowledge",
+    }
+
+    @classmethod
+    def _clean_label(cls, bullet: str) -> str:
+        """Strip a leading verb phrase ("Expertise in ...") so the bullet reads
+        naturally mid-sentence, e.g. for the JD-match highlight sentence."""
+        text = bullet
+        for pattern in cls._LEAD_IN_PATTERNS:
+            text = re.sub(pattern, '', text, flags=re.I)
+        text = text.strip()
+        if len(text) > 60:
+            text = text[:57].rstrip() + "..."
+        return (text[0].lower() + text[1:]) if text else text
+
+    @classmethod
+    def _derive_keywords(cls, bullet: str) -> List[str]:
+        """Auto-derive JD-matching keywords from a bullet's text — tools/technologies
+        named in parentheses plus other significant words in the bullet."""
+        keywords = []
+        for group in re.findall(r'\(([^)]*)\)', bullet):
+            for part in re.split(r'[,/]', group):
+                part = part.strip().lower()
+                if part:
+                    keywords.append(part)
+
+        outside = re.sub(r'\([^)]*\)', '', bullet).lower()
+        for word in re.findall(r'[a-z][a-z0-9\-+.]{2,}', outside):
+            if word not in cls._KEYWORD_STOPWORDS:
+                keywords.append(word)
+
+        return list(dict.fromkeys(keywords))  # dedupe, preserve order
+
+    def _build_skill_categories(self, bullets: List[str]):
+        """Turn plain bullet strings into (bullet, label, keywords) tuples,
+        matching the shape of DEFAULT_SKILL_CATEGORIES."""
+        return [(bullet, self._clean_label(bullet), self._derive_keywords(bullet)) for bullet in bullets]
 
     # (bullet text, short label for the highlight sentence, keywords to match in a JD)
-    SKILL_CATEGORIES = [
+    DEFAULT_SKILL_CATEGORIES = [
         ("Expertise in cloud platforms (AWS, Azure, GCP)",
          "cloud infrastructure (AWS/Azure/GCP)",
          ["aws", "amazon web services", "azure", "gcp", "google cloud", "cloud platform", "cloud infrastructure"]),
@@ -115,7 +178,7 @@ class JobApplicationEmailer:
         jd_lower = jd_text.lower()
         matched, unmatched, matched_labels = [], [], []
 
-        for bullet, label, keywords in self.SKILL_CATEGORIES:
+        for bullet, label, keywords in self.skill_categories:
             if any(keyword in jd_lower for keyword in keywords):
                 matched.append(bullet)
                 matched_labels.append(label)
@@ -133,7 +196,7 @@ class JobApplicationEmailer:
                 joined = f"{shown[0]} and {shown[1]}"
             else:
                 joined = f"{', '.join(shown[:-1])}, and {shown[-1]}"
-            highlight_sentence = f"\n\nYour job description calls out {joined}, which are core parts of my day-to-day DevOps work."
+            highlight_sentence = f"\n\nYour job description calls out {joined}, which are core parts of my day-to-day work."
 
         return bullets, highlight_sentence
 
@@ -162,29 +225,26 @@ class JobApplicationEmailer:
         if jd_text.strip():
             bullets, highlight_sentence = self._tailor_to_jd(jd_text)
         else:
-            bullets = [b for b, _, _ in self.SKILL_CATEGORIES]
+            bullets = [b for b, _, _ in self.skill_categories]
             highlight_sentence = ""
 
         bullet_block = "\n".join(f"• {b}" for b in bullets)
         org_name = company.strip() or "your organization"
 
+        details_block = ""
+        if self.application_details:
+            details_lines = "\n".join(f"• {k}: {v}" for k, v in self.application_details.items() if v)
+            if details_lines:
+                details_block = f"\n\nThese are my current details:\n{details_lines}"
+
         email_body = f"""Dear {hr_name},
 
 I hope this email finds you well.
 
-I am writing to express my strong interest in DevOps SRE Engineer opportunities within {org_name}. With 4+ years of proven track record in cloud infrastructure, automation, and CI/CD pipelines, I am confident that my skills align well with your team's needs.{highlight_sentence}
+I am writing to express my strong interest in {self.target_role} opportunities within {org_name}. With {self.experience_summary}, I am confident that my skills align well with your team's needs.{highlight_sentence}
 
 Key Highlights of My Profile:
-{bullet_block}
-
-These are my current details:
-• Total Experience: 4.6 years
-• Rel Experience: 4.6 years
-• Current CTC: 14.7 lpa
-• Expected CTC: 20 to 22lpa (negotiable)
-• Notice Period:  30 days (negotiable)
-• Current Location: Delhi NCR
-• Open to Relocate: Yes
+{bullet_block}{details_block}
 
 I have attached my resume for your review, which provides detailed information about my professional experience, technical skills, and accomplishments.
 
@@ -232,7 +292,7 @@ Best regards,
         message = MIMEMultipart()
         message['From'] = f"{self.sender_name} <{self.sender_email}>"
         message['To'] = recipient_email
-        message['Subject'] = f"Application for DevOps Engineer Position - {self.sender_name}"
+        message['Subject'] = f"Application for {self.target_role} Position - {self.sender_name}"
 
         # Add body
         body = self.create_email_body(hr_name, jd_text, company)

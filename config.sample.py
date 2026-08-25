@@ -28,6 +28,39 @@ YOUR_PASSWORD = "xxxx xxxx xxxx xxxx"  # 16-character app password
 # Update this with the absolute path to your resume file
 RESUME_PATH = r"C:\path\to\your\resume.pdf"  # or /Users/username/path/to/resume.pdf on Mac
 
+# Application Content — this is what makes the tool work for ANY role, not just DevOps.
+# Update these to match the job you're applying for.
+TARGET_ROLE = "DevOps Engineer"  # e.g. "Backend Engineer", "Data Analyst", "Product Manager"
+EXPERIENCE_SUMMARY = "4+ years of proven track record in cloud infrastructure, automation, and CI/CD pipelines"
+
+# Skill bullets shown in "Key Highlights of My Profile". List whatever's true for you.
+# Put tools/technologies in parentheses (e.g. "Skilled in X (Tool A, Tool B)") — these
+# are automatically picked up as keywords when tailoring the email to a pasted job description.
+SKILL_HIGHLIGHTS = [
+    "Expertise in cloud platforms (AWS, Azure, GCP)",
+    "Proficient in containerization technologies (Docker, Kubernetes)",
+    "Strong experience with CI/CD tools (Jenkins, GitLab CI, GitHub Actions)",
+    "Infrastructure as Code (Terraform, Ansible, CloudFormation)",
+    "Monitoring and logging solutions (Prometheus, Grafana, ELK Stack)",
+    "Scripting languages (Python, Bash, PowerShell)",
+    "Version control systems (Git, GitHub, GitLab)",
+]
+# Example for a completely different role — just replace the list above with something like:
+# SKILL_HIGHLIGHTS = [
+#     "Proficient in backend development (Java, Spring Boot, Node.js)",
+#     "Experience with relational and NoSQL databases (PostgreSQL, MongoDB)",
+#     "Strong understanding of REST API design and microservices architecture",
+# ]
+
+# Optional extra details listed at the end of the email (experience, CTC, notice
+# period, location, etc.). Leave this as an empty dict to omit the section entirely —
+# useful if you don't want to share compensation/notice-period details in a cold email.
+APPLICATION_DETAILS = {
+    # "Total Experience": "3 years",
+    # "Notice Period": "30 days",
+    # "Current Location": "Bangalore",
+}
+
 # SMTP Server Configuration
 # Gmail (default)
 SMTP_SERVER = "smtp.gmail.com"

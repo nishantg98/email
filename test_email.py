@@ -45,7 +45,14 @@ def main():
         sender_name=config.YOUR_NAME,
         sender_phone=config.YOUR_PHONE,
         sender_linkedin=config.YOUR_LINKEDIN,
-        sender_website=config.YOUR_WEBSITE
+        sender_website=config.YOUR_WEBSITE,
+        target_role=getattr(config, 'TARGET_ROLE', 'DevOps Engineer'),
+        experience_summary=getattr(
+            config, 'EXPERIENCE_SUMMARY',
+            '4+ years of proven track record in cloud infrastructure, automation, and CI/CD pipelines'
+        ),
+        skill_highlights=getattr(config, 'SKILL_HIGHLIGHTS', None),
+        application_details=getattr(config, 'APPLICATION_DETAILS', {})
     )
 
     # Send test email
