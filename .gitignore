@@ -41,3 +41,6 @@ Thumbs.db
 # Environment variables
 .env
 .env.local
+
+# Local application history (recipient emails, do not commit)
+sent_applications.csv
