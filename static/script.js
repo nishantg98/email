@@ -11,6 +11,13 @@ const historyList = document.getElementById('historyList');
 const hrNameInput = document.getElementById('hrNameInput');
 const companyInput = document.getElementById('companyInput');
 
+// Job description elements
+const jdInput = document.getElementById('jdInput');
+const jdWrapper = document.getElementById('jdWrapper');
+const jdHint = document.getElementById('jdHint');
+const toggleJd = document.getElementById('toggleJd');
+const jdToggleText = document.getElementById('jdToggleText');
+
 // Bulk mode elements
 const singleEmailGroup = document.getElementById('singleEmailGroup');
 const bulkEmailGroup = document.getElementById('bulkEmailGroup');
@@ -146,6 +153,16 @@ toggleSingleMode.addEventListener('click', () => {
     emailInput.focus();
 });
 
+// ===== Job Description Toggle =====
+let jdOpen = false;
+toggleJd.addEventListener('click', () => {
+    jdOpen = !jdOpen;
+    jdWrapper.style.display = jdOpen ? 'block' : 'none';
+    jdHint.style.display = jdOpen ? 'none' : 'flex';
+    jdToggleText.textContent = jdOpen ? 'Collapse' : 'Add JD';
+    if (jdOpen) jdInput.focus();
+});
+
 // ===== Cover Letter Toggle =====
 toggleCoverLetter.addEventListener('click', () => {
     coverLetterOpen = !coverLetterOpen;
@@ -225,6 +242,9 @@ function buildSharedFormData() {
     }
     if (companyInput.value.trim()) {
         formData.append('company', companyInput.value.trim());
+    }
+    if (jdOpen && jdInput.value.trim()) {
+        formData.append('jd_text', jdInput.value.trim());
     }
     return formData;
 }

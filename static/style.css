@@ -295,8 +295,8 @@ body {
   padding-left: 16px;
 }
 
-/* ===== Bulk Emails Textarea ===== */
-#bulkEmailsInput {
+/* ===== Bulk Emails / JD Textarea ===== */
+.plain-textarea {
   width: 100%;
   padding: 14px 16px;
   background: rgba(255, 255, 255, 0.04);
@@ -311,7 +311,7 @@ body {
   transition: all 0.3s ease;
 }
 
-#bulkEmailsInput:focus {
+.plain-textarea:focus {
   border-color: var(--accent-1);
   box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
   background: rgba(255, 255, 255, 0.06);

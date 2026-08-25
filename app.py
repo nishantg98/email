@@ -3,7 +3,7 @@ Email Sender Web Application
 A beautiful web interface to send job application emails
 """
 from flask import Flask, render_template, request, jsonify
-from email_sender_v2 import JobApplicationEmailer
+from email_sender_v2 import JobApplicationEmailer, extract_name_from_email
 import config
 import os
 import re
@@ -76,6 +76,18 @@ def _resolve_resume_path(uploaded_resume):
     return config.RESUME_PATH, None
 
 
+def _greeting_name(hr_name, company, recipient_email):
+    """Priority: explicit HR name > name guessed from the recipient's email > company > generic fallback."""
+    if hr_name:
+        return hr_name
+    guessed = extract_name_from_email(recipient_email)
+    if guessed:
+        return guessed
+    if company:
+        return f"the {company} team"
+    return "Hiring Manager"
+
+
 def _build_emailer(custom_cover_letter):
     emailer = JobApplicationEmailer(
         sender_email=config.YOUR_EMAIL,
@@ -86,7 +98,7 @@ def _build_emailer(custom_cover_letter):
         sender_website=config.YOUR_WEBSITE
     )
     if custom_cover_letter:
-        emailer.create_email_body = lambda hr_name="Hiring Manager": custom_cover_letter
+        emailer.create_email_body = lambda hr_name="Hiring Manager", jd_text="", company="": custom_cover_letter
     return emailer
 
 
@@ -97,6 +109,7 @@ def send_email():
     custom_cover_letter = request.form.get('cover_letter', '').strip()
     hr_name = request.form.get('hr_name', '').strip()
     company = request.form.get('company', '').strip()
+    jd_text = request.form.get('jd_text', '').strip()
     uploaded_resume = request.files.get('resume')
 
     # Validate email
@@ -113,13 +126,15 @@ def send_email():
 
     emailer = _build_emailer(custom_cover_letter)
 
-    greeting_name = hr_name or (f"the {company} team" if company else "Hiring Manager")
+    greeting_name = _greeting_name(hr_name, company, recipient_email)
 
     try:
         result = emailer.send_email(
             recipient_email=recipient_email,
             resume_path=resume_path,
             hr_name=greeting_name,
+            jd_text=jd_text,
+            company=company,
             smtp_server=config.SMTP_SERVER,
             smtp_port=config.SMTP_PORT,
             timeout=60
@@ -142,6 +157,7 @@ def send_bulk():
     custom_cover_letter = request.form.get('cover_letter', '').strip()
     hr_name = request.form.get('hr_name', '').strip()
     company = request.form.get('company', '').strip()
+    jd_text = request.form.get('jd_text', '').strip()
     uploaded_resume = request.files.get('resume')
 
     # Split on commas/newlines, dedupe, validate
@@ -173,15 +189,17 @@ def send_bulk():
         return jsonify({'success': False, 'message': 'Resume file not found. Please upload one or check config.py.'}), 500
 
     emailer = _build_emailer(custom_cover_letter)
-    greeting_name = hr_name or (f"the {company} team" if company else "Hiring Manager")
 
     results = []
     try:
         for i, recipient_email in enumerate(recipients):
+            greeting_name = _greeting_name(hr_name, company, recipient_email)
             result = emailer.send_email(
                 recipient_email=recipient_email,
                 resume_path=resume_path,
                 hr_name=greeting_name,
+                jd_text=jd_text,
+                company=company,
                 smtp_server=config.SMTP_SERVER,
                 smtp_port=config.SMTP_PORT,
                 timeout=60

@@ -73,7 +73,7 @@
               <span>Send to one</span>
             </button>
           </div>
-          <textarea id="bulkEmailsInput" name="emails" rows="5"
+          <textarea id="bulkEmailsInput" name="emails" class="plain-textarea" rows="5"
             placeholder="hr1@company.com&#10;hr2@company.com&#10;hr3@company.com"></textarea>
         </div>
 
@@ -125,6 +125,23 @@
               <polyline points="14 2 14 8 20 8" />
             </svg>
             <span id="defaultResumeName">Default: Nishant-DevOps-Resume.pdf</span>
+          </div>
+        </div>
+
+        <!-- Job Description (tailors skill highlights) -->
+        <div class="form-group">
+          <div class="label-row">
+            <label for="jdInput">Job Description (optional)</label>
+            <button type="button" class="toggle-btn" id="toggleJd">
+              <span id="jdToggleText">Add JD</span>
+            </button>
+          </div>
+          <div id="jdWrapper" style="display:none;">
+            <textarea id="jdInput" name="jd_text" class="plain-textarea" rows="6"
+              placeholder="Paste the job description here. Matching skills will be moved to the top of your cover letter and called out in an opening line."></textarea>
+          </div>
+          <div class="default-badge" id="jdHint">
+            Paste a JD to auto-highlight your matching skills (ignored if you customize the cover letter below)
           </div>
         </div>
 

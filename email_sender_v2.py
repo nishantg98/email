@@ -5,9 +5,36 @@ from email.mime.base import MIMEBase
 from email import encoders
 from dataclasses import dataclass
 import os
+import re
 from typing import List
 import time
 import socket
+
+# Generic mailbox names that aren't a person's name, even though they sit
+# before the @ (e.g. hr@company.com, careers@company.com)
+_GENERIC_MAILBOX_NAMES = {
+    "hr", "info", "careers", "career", "jobs", "job", "recruiting",
+    "recruitment", "recruiter", "talent", "admin", "contact", "support",
+    "noreply", "no-reply", "team", "hello", "apply", "applications",
+    "resumes", "cv",
+}
+
+
+def extract_name_from_email(email: str) -> str:
+    """Best-effort guess at a person's first name from an email's local part,
+    e.g. "nishant.gupta@ukg.com" -> "Nishant". Returns "" for generic mailbox
+    addresses (hr@, careers@, ...) where no real name can be inferred."""
+    local_part = email.split('@', 1)[0]
+    tokens = [t for t in re.split(r'[._\-+\d]+', local_part) if t]
+
+    if not tokens:
+        return ""
+
+    candidate = tokens[0].lower()
+    if candidate in _GENERIC_MAILBOX_NAMES or len(candidate) < 2:
+        return ""
+
+    return candidate.capitalize()
 
 # PythonAnywhere sandboxes have no outbound IPv6 route, but smtp.gmail.com
 # publishes AAAA records too. Forcing IPv4-only resolution avoids
@@ -55,12 +82,70 @@ class JobApplicationEmailer:
         self.sender_linkedin = sender_linkedin
         self.sender_website = sender_website
 
-    def create_email_body(self, hr_name: str = "Hiring Manager") -> str:
+    # (bullet text, short label for the highlight sentence, keywords to match in a JD)
+    SKILL_CATEGORIES = [
+        ("Expertise in cloud platforms (AWS, Azure, GCP)",
+         "cloud infrastructure (AWS/Azure/GCP)",
+         ["aws", "amazon web services", "azure", "gcp", "google cloud", "cloud platform", "cloud infrastructure"]),
+        ("Proficient in containerization technologies (Docker, Kubernetes)",
+         "containerization (Docker/Kubernetes)",
+         ["docker", "kubernetes", "k8s", "container"]),
+        ("Strong experience with CI/CD tools (Jenkins, GitLab CI, GitHub Actions)",
+         "CI/CD pipelines",
+         ["ci/cd", "continuous integration", "continuous deployment", "continuous delivery",
+          "jenkins", "gitlab ci", "github actions", "circleci", "travis"]),
+        ("Infrastructure as Code (Terraform, Ansible, CloudFormation)",
+         "Infrastructure as Code",
+         ["terraform", "ansible", "cloudformation", "infrastructure as code", "iac", "pulumi"]),
+        ("Monitoring and logging solutions (Prometheus, Grafana, ELK Stack)",
+         "monitoring and observability",
+         ["prometheus", "grafana", "elk", "elasticsearch", "logging", "monitoring", "observability",
+          "datadog", "splunk", "new relic"]),
+        ("Scripting languages (Python, Bash, PowerShell)",
+         "scripting and automation",
+         ["python", "bash", "powershell", "shell scripting", "scripting"]),
+        ("Version control systems (Git, GitHub, GitLab)",
+         "version control",
+         ["git", "github", "gitlab", "bitbucket", "version control"]),
+    ]
+
+    def _tailor_to_jd(self, jd_text: str):
+        """Reorder skill bullets to surface JD-matched ones first, and build a
+        one-line callout. Pure keyword matching — no AI, no invented content."""
+        jd_lower = jd_text.lower()
+        matched, unmatched, matched_labels = [], [], []
+
+        for bullet, label, keywords in self.SKILL_CATEGORIES:
+            if any(keyword in jd_lower for keyword in keywords):
+                matched.append(bullet)
+                matched_labels.append(label)
+            else:
+                unmatched.append(bullet)
+
+        bullets = matched + unmatched
+
+        highlight_sentence = ""
+        if matched_labels:
+            shown = matched_labels[:3]
+            if len(shown) == 1:
+                joined = shown[0]
+            elif len(shown) == 2:
+                joined = f"{shown[0]} and {shown[1]}"
+            else:
+                joined = f"{', '.join(shown[:-1])}, and {shown[-1]}"
+            highlight_sentence = f"\n\nYour job description calls out {joined}, which are core parts of my day-to-day DevOps work."
+
+        return bullets, highlight_sentence
+
+    def create_email_body(self, hr_name: str = "Hiring Manager", jd_text: str = "", company: str = "") -> str:
         """
         Create the email body content
 
         Args:
             hr_name: Name of the HR person (if known)
+            jd_text: Optional job description text used to reorder skill bullets
+                     and add a one-line callout for matched keywords
+            company: Optional company name, used in place of "your organization"
 
         Returns:
             Email body as string
@@ -73,27 +158,39 @@ class JobApplicationEmailer:
             contact_info += f"\nLinkedIn: {self.sender_linkedin}"
         if self.sender_website:
             contact_info += f"\nPortfolio: {self.sender_website}"
-        
+
+        if jd_text.strip():
+            bullets, highlight_sentence = self._tailor_to_jd(jd_text)
+        else:
+            bullets = [b for b, _, _ in self.SKILL_CATEGORIES]
+            highlight_sentence = ""
+
+        bullet_block = "\n".join(f"• {b}" for b in bullets)
+        org_name = company.strip() or "your organization"
+
         email_body = f"""Dear {hr_name},
 
 I hope this email finds you well.
 
-I am writing to express my strong interest in DevOps SRE Engineer opportunities within your organization. With 4+ years of proven track record in cloud infrastructure, automation, and CI/CD pipelines, I am confident that my skills align well with your team's needs.
+I am writing to express my strong interest in DevOps SRE Engineer opportunities within {org_name}. With 4+ years of proven track record in cloud infrastructure, automation, and CI/CD pipelines, I am confident that my skills align well with your team's needs.{highlight_sentence}
 
 Key Highlights of My Profile:
-• Expertise in cloud platforms (AWS, Azure, GCP)
-• Proficient in containerization technologies (Docker, Kubernetes)
-• Strong experience with CI/CD tools (Jenkins, GitLab CI, GitHub Actions)
-• Infrastructure as Code (Terraform, Ansible, CloudFormation)
-• Monitoring and logging solutions (Prometheus, Grafana, ELK Stack)
-• Scripting languages (Python, Bash, PowerShell)
-• Version control systems (Git, GitHub, GitLab)
+{bullet_block}
+
+These are my current details:
+• Total Experience: 4.6 years
+• Rel Experience: 4.6 years
+• Current CTC: 14.7 lpa
+• Expected CTC: 20 to 22lpa (negotiable)
+• Notice Period:  30 days (negotiable)
+• Current Location: Delhi NCR
+• Open to Relocate: Yes
 
 I have attached my resume for your review, which provides detailed information about my professional experience, technical skills, and accomplishments.
 
 I would welcome the opportunity to discuss how my background and skills can contribute to your team's success. I am available for an interview at your convenience and can be reached at {self.sender_email}.
 
-Thank you for considering my application. I look forward to the possibility of working with your organization.
+Thank you for considering my application. I look forward to the possibility of working with {org_name}.
 
 Best regards,
 {self.sender_name}
@@ -105,6 +202,8 @@ Best regards,
                    recipient_email: str,
                    resume_path: str,
                    hr_name: str = "Hiring Manager",
+                   jd_text: str = "",
+                   company: str = "",
                    smtp_server: str = "smtp.gmail.com",
                    smtp_port: int = 587,
                    timeout: int = 60,
@@ -117,6 +216,8 @@ Best regards,
             recipient_email: HR email address
             resume_path: Path to your resume file
             hr_name: Name of the HR person
+            jd_text: Optional job description text to tailor the cover letter bullets
+            company: Optional company name, used in place of "your organization"
             smtp_server: SMTP server address
             smtp_port: SMTP port number
             timeout: Connection timeout in seconds
@@ -134,7 +235,7 @@ Best regards,
         message['Subject'] = f"Application for DevOps Engineer Position - {self.sender_name}"
 
         # Add body
-        body = self.create_email_body(hr_name)
+        body = self.create_email_body(hr_name, jd_text, company)
         message.attach(MIMEText(body, 'plain'))
 
         print(f"  [2/5] Attaching resume...")
