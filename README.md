@@ -10,6 +10,10 @@ An automated Python script to send professional cold emails for DevOps Engineer 
 - 🔒 Secure email authentication
 - 📊 Progress tracking and success/failure reporting
 - 🎯 Professional email template for DevOps Engineer positions
+- 🔁 Automatic retry (up to 3 attempts) on transient network/connection errors
+- 🧑‍💼 Optional HR Name / Company fields to personalize the greeting
+- 📬 Web UI supports sending to a single recipient or a batch (up to 25 at once)
+- 🗂️ Every send attempt (success or failure) is logged to `sent_applications.csv` for later review
 
 ## 🚀 Quick Start
 
@@ -107,6 +111,18 @@ for Python apps is [PythonAnywhere](https://www.pythonanywhere.com/).
 > required, and the web UI simply calls the same `email_sender_v2` logic.
 
 ---
+
+## 🖥️ Web Interface Features
+
+The Flask web UI (`app.py` + `templates/index.html`) supports:
+
+- **Single send** — enter one recipient email, optionally upload a different resume or customize the cover letter for that email.
+- **Bulk send** — click "Send to multiple" to paste up to 25 recipient emails (one per line or comma-separated). Each is sent one at a time with the configured `DELAY_BETWEEN_EMAILS` between sends.
+- **HR Name / Company fields** — optional inputs that personalize the email greeting (e.g. "Dear Jane Doe" or "Dear the Acme Corp team") without editing the full cover letter.
+- **Sent history** — a "Sent This Session" panel in the browser (persisted in `localStorage`, so it survives page reloads) that warns you before re-sending to an address you've already applied to.
+- **Application log file** — every send attempt, successful or failed, is appended to `sent_applications.csv` in the project folder with a timestamp, recipient, HR name/company, success flag, and the reason for any failure. This file is server-side and gitignored (it contains real recipient addresses), so it persists independently of your browser and is the best place to review your full application history. On PythonAnywhere, view or download it from the **Files** tab, or `cat sent_applications.csv` in a Bash console.
+
+---
 ## 📧 Email Template
 
 The script sends a professional email with the following structure:
@@ -168,10 +184,17 @@ DELAY_BETWEEN_EMAILS = 10  # Change to desired seconds
 
 ```
 email/
-├── email_sender_v2.py          # Main email sending class
-├── config.py                # Configuration file (UPDATE THIS)
-├── send_applications.py     # Simple runner script
-└── README.md               # This file
+├── app.py                      # Flask web app (single + bulk send UI)
+├── email_sender_v2.py          # Main email sending class (retry logic, IPv4 fix)
+├── config.py                   # Configuration file (UPDATE THIS, gitignored)
+├── send_applications.py        # CLI runner script for bulk sends from config.py
+├── quick_test.py                # Non-interactive single test send
+├── test_email.py                # Interactive single test send
+├── templates/index.html         # Web UI markup
+├── static/script.js             # Web UI behavior
+├── static/style.css             # Web UI styling
+├── sent_applications.csv        # Application history log (auto-created, gitignored)
+└── README.md                    # This file
 ```
 
 ## ⚠️ Important Notes
@@ -180,6 +203,7 @@ email/
 - **Never** commit `config.py` with your real credentials to version control
 - Use App Passwords, not your regular email password
 - Keep your resume file secure
+- `sent_applications.csv` contains real recipient email addresses — it's gitignored by default; don't remove that entry or commit the file
 
 ### Email Limits
 - Gmail: ~500 emails per day for regular accounts
@@ -198,6 +222,12 @@ email/
 - Make sure you're using an App Password, not your regular password
 - Verify 2-Step Verification is enabled for Gmail
 - Check that your email and password are correct in `config.py`
+- Authentication failures are **not** retried automatically (retrying won't fix bad credentials), so this error surfaces immediately
+
+### Intermittent "Network is unreachable" / connection errors (e.g. on PythonAnywhere)
+- `email_sender_v2.py` forces IPv4-only DNS resolution, since some hosts (like PythonAnywhere's free tier) have no outbound IPv6 route and `smtp.gmail.com` publishes both `A` and `AAAA` records
+- Transient connection errors are automatically retried up to 3 times with a short delay before being reported as failed
+- Check `sent_applications.csv` for the exact failure reason recorded for any recipient
 
 ### "Resume file not found" error
 - Check the file path in `config.py`
