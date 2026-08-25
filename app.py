@@ -9,8 +9,30 @@ import os
 import re
 import tempfile
 import time
+import csv
+from datetime import datetime
 
 app = Flask(__name__)
+
+SENT_LOG_PATH = os.path.join(os.path.dirname(__file__), 'sent_applications.csv')
+SENT_LOG_FIELDS = ['timestamp', 'email', 'hr_name', 'company', 'success', 'message']
+
+
+def _log_sent_email(email, success, message, hr_name='', company=''):
+    """Append a record of every send attempt to a local CSV file for later review."""
+    file_exists = os.path.exists(SENT_LOG_PATH)
+    with open(SENT_LOG_PATH, 'a', newline='', encoding='utf-8') as f:
+        writer = csv.DictWriter(f, fieldnames=SENT_LOG_FIELDS)
+        if not file_exists:
+            writer.writeheader()
+        writer.writerow({
+            'timestamp': datetime.now().isoformat(timespec='seconds'),
+            'email': email,
+            'hr_name': hr_name,
+            'company': company,
+            'success': success,
+            'message': message,
+        })
 
 
 def get_default_cover_letter():
@@ -106,6 +128,8 @@ def send_email():
         if temp_resume_path and os.path.exists(temp_resume_path):
             os.remove(temp_resume_path)
 
+    _log_sent_email(recipient_email, result.success, result.message, hr_name, company)
+
     if result.success:
         return jsonify({'success': True, 'message': result.message})
     return jsonify({'success': False, 'message': result.message}), 500
@@ -163,6 +187,7 @@ def send_bulk():
                 timeout=60
             )
             results.append({'email': recipient_email, 'success': result.success, 'message': result.message})
+            _log_sent_email(recipient_email, result.success, result.message, hr_name, company)
             if i < len(recipients) - 1:
                 time.sleep(config.DELAY_BETWEEN_EMAILS)
     finally:
@@ -171,6 +196,7 @@ def send_bulk():
 
     for email in invalid:
         results.append({'email': email, 'success': False, 'message': 'Invalid email address, skipped.'})
+        _log_sent_email(email, False, 'Invalid email address, skipped.', hr_name, company)
 
     sent = sum(1 for r in results if r['success'])
     return jsonify({
